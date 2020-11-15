@@ -2,6 +2,7 @@ import numpy as np
 from skimage.color import rgb2gray
 from skimage.transform import resize
 import gym
+from gym import wrappers
 
 pic_width = 84
 pic_height = 84
@@ -14,8 +15,11 @@ def change_pict(pict):
 
 
 class gym_env:
-    def __init__(self):
+    def __init__(self, worker_id):
         self.env = gym.make("BreakoutDeterministic-v4")
+        self.env.reset()
+        if worker_id == 0:
+            self.env = wrappers.Monitor(self.env, "/home/emile/Videos/", video_callable=(lambda ep: ep % 50 == 0))
         self.life = -1
         self.fire_action = 1
 

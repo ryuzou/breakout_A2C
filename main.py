@@ -33,7 +33,7 @@ class step_info:
 
 
 def worker_func(worker_id, pipe):
-    env = gym_env()
+    env = gym_env(worker_id)
     pict_queue = collections.deque(maxlen=frame_siz)
     _state = env.reset()
     for _ in range(frame_siz):
@@ -49,7 +49,7 @@ def worker_func(worker_id, pipe):
             n_state = np.stack(pict_queue, axis=0).reshape(convert_shape)
             ans = step_info(states, act, rew, n_state, done, info)
             states = n_state
-            if info:
+            if info and (not done):
                 # ans = step_info(states, act, -1.0, n_state, done, info)  # new
                 n_state, _, _, _ = env.step(1)
                 pict_queue.clear()
