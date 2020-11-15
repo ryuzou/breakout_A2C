@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
+dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 
 class Network(torch.nn.Module):
     def __init__(self, action_space, step_repeat_times, alpha, beta):
@@ -26,7 +28,7 @@ class Network(torch.nn.Module):
 
 
     def forward(self, inputs):  # c1 -> elu -> c2 -> elu -> c3 -> elu -> c4 -> elu -> flatten -> l5 -> elu -> actor/critic
-        inputs = torch.from_numpy(inputs).float()
+        inputs = torch.from_numpy(inputs).float().to(dev)
         inputs /= 255.0
         # print("inputs : {}".format(inputs.shape))
         x = self.c1(inputs)
@@ -47,9 +49,9 @@ class Network(torch.nn.Module):
 
     def select_action(self, state):
         _, logits = self(state)
-        probs = F.softmax(logits, dim=0)
+        probs = F.softmax(logits, dim=0).to(dev)
         c_rand = torch.distributions.categorical.Categorical(probs=probs.detach())  # detach はTensorから勾配を抜いた物
-        act = c_rand.sample()
+        act = c_rand.sample().cpu()
         # print("act {}".format(act))
         return act.numpy().copy(), probs
 
@@ -62,10 +64,10 @@ class Network(torch.nn.Module):
     def calc_loss(self, states, acts, d_rews, probs):
 
 
-        acts_one_hot = torch.from_numpy(np.identity(4)[acts])  # one_hot ベクトルに変換
-        probs = torch.stack(probs, dim=0)
-        d_rews = torch.stack(d_rews, dim=0).view(-1)
-        v_states = torch.stack([self(state)[0][0] for state in states], dim=0).view(-1)
+        acts_one_hot = torch.from_numpy(np.identity(4)[acts]).to(dev)  # one_hot ベクトルに変換
+        probs = torch.stack(probs, dim=0).to(dev)
+        d_rews = torch.stack(d_rews, dim=0).view(-1).to(dev)
+        v_states = torch.stack([self(state)[0][0] for state in states], dim=0).view(-1).to(dev)
 
         # print("states size {}".format(v_states.shape))
         # # print("acts size {}".format(acts.shape))
@@ -73,22 +75,21 @@ class Network(torch.nn.Module):
         # print("probs size {}".format(probs.shape))
 
         # pis = torch.dot(acts_one_hot, probs)  # pi(a_t|s_t) (t=1,2,...)
-        pis = torch.sum(acts_one_hot * probs, dim=1)
+        pis = torch.sum(acts_one_hot * probs, dim=1).to(dev)
         # print("pis shape {}.".format(pis.shape))
-        log_pis = torch.log(pis)  # log(pi(a_t|s_t)) (t=1,2,...)
+        log_pis = torch.log(pis).to(dev)  # log(pi(a_t|s_t)) (t=1,2,...)
 
-        entropy = -torch.dot(pis, log_pis)
+        entropy = -torch.dot(pis, log_pis).to(dev)
         # print("d_res shape {}".format(d_rews.shape))
         # print("v_state shape {}".format(v_states.shape))
         advantage = d_rews - v_states
         # print("adv shape {}".format(advantage.shape))
         # print("log_pis {}".format(log_pis.shape))
-        v_loss =advantage **2
-        a_loss = log_pis * advantage
+        v_loss = (advantage **2).to(dev)
+        a_loss = (log_pis * advantage).to(dev)
         # print("a_loss shape {}".format(a_loss.shape))
         ans = 0.5*self.alpha*v_loss - a_loss - self.beta*entropy
-        ans = torch.sum(ans, dim=0)
-
+        ans = ans.to(dev)
+        ans = torch.sum(ans, dim=0).to(dev)
 
         return ans
-

@@ -1,12 +1,13 @@
 from dataclasses import dataclass
 import numpy as np
 import torch
-from gym import wrappers
+# import torchviz
 from env import gym_env
 from model import Network
 from multiprocessing import Pipe, Process
 import collections
-import torchviz
+
+dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 TMP = False
 
@@ -49,6 +50,7 @@ def worker_func(worker_id, pipe):
             ans = step_info(states, act, rew, n_state, done, info)
             states = n_state
             if info:
+                # ans = step_info(states, act, -1.0, n_state, done, info)  # new
                 n_state, _, _, _ = env.step(1)
                 pict_queue.clear()
                 for _ in range(frame_siz):
@@ -95,20 +97,6 @@ class Workers:
         for pipe in self.self_pips:
             pipe.send(("test", None))
 
-    # def step(self, actions):
-    #     for pipe, act in zip(self.self_pips, actions):
-    #         pipe.send(("step", act))
-    #
-    #     steps = [pipe.recv() for pipe in self.self_pips]
-    #     states = [step.state for step in steps]
-    #     actions = [step.action for step in steps]
-    #     n_states = [step.n_state for step in steps]
-    #     dones = [step.done for step in steps]
-    #     infos = [step.info for step in steps]
-    #     rews = [step.rew for step in steps]
-    #
-    #     return states, act, rews, n_states, dones, infos
-
     def step(self, worker_id, action):
         self.self_pips[worker_id].send(("step", action))
         step = self.self_pips[worker_id].recv()
@@ -140,10 +128,12 @@ class Workers:
             acts.append(act)
             probs.append(prob)
             if step.done:
+                rews[-1] = -1.0  # new
                 flag = True
                 break
 
             if step.info:
+                rews[-1] = -1.0  # new
                 break
 
             if i != step_repeat_time - 1:
@@ -160,6 +150,7 @@ class Agent:
         self.global_score = collections.deque(maxlen=50)
         self.w_states = [self.workers.get_state(i) for i in range(self.workers.num_workers)]  # states of each workers.
         self.w_stop = []  # if true then do not worker.step()
+        self.train_time = 0
 
     def calc_drew(self, rews, last_state):  # last_state は時系列的に最後のstate (n_states[-1]でok)
         d_rews = []
@@ -174,9 +165,10 @@ class Agent:
     def init_state(self, worker_id):
         score = self.workers.score(worker_id)
         self.global_score.append(score)
-        print("ID{} : score is {}. average is {}.".format(worker_id, score, float(sum(self.global_score)) / float(
+        print("ID[{}] : train time is {} : score is {}. average is {}.".format(worker_id, self.train_time, score, float(sum(self.global_score)) / float(
             len(self.global_score))))
 
+        self.train_time += 1
         self.w_states[worker_id] = self.workers.reset(worker_id)
 
     def play_n_step(self):
@@ -200,15 +192,16 @@ class Agent:
         return states, d_rews, acts, probs
 
     def train(self):
+        self.network.to(dev)
         while True:
             states, d_rews, acts, probs = self.play_n_step()
             loss = self.network.calc_loss(states, acts, d_rews, probs)
-            dot = torchviz.make_dot(loss, params=dict(self.network.named_parameters()))
-            dot.format = 'png'
-            global TMP
-            if not TMP:
-                dot.render('/home/emile/Documents/Code/breakout_A2C/graph_image')
-                TMP = True
+            # dot = torchviz.make_dot(loss, params=dict(self.network.named_parameters()))
+            # dot.format = 'png'
+            # global TMP
+            # if not TMP:
+            #     dot.render('/home/emile/Documents/Code/breakout_A2C/graph_image')
+            #     TMP = True
             self.optimizer.zero_grad()
             loss.backward()
 
