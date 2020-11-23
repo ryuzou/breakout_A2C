@@ -22,7 +22,7 @@ advantage_len = 5
 frame_siz = 4
 Worker_num = 16
 alpha = 0.5
-beta = 0.01
+beta = 0.005 # 0.01
 gamma = 0.99
 pic_width = 84
 pic_height = 84
@@ -182,7 +182,7 @@ class Agent:
     def __init__(self):
         self.network = Network(action_space=4, step_repeat_times=frame_siz, alpha=alpha, beta=beta)
         self.workers = Workers(num_workers=Worker_num)
-        self.optimizer = torch.optim.Adam(self.network.parameters(), lr=1e-4)
+        self.optimizer = torch.optim.Adam(self.network.parameters(), lr=0.00005)
         self.global_score = collections.deque(maxlen=50)
         self.w_states = [self.workers.get_state(i) for i in range(self.workers.num_workers)]  # states of each workers.
         self.w_stop = []  # if true then do not worker.step()
