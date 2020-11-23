@@ -228,6 +228,7 @@ class Agent:
                 with open(data_path, 'wb') as wb:
                     pickle.dump(self.train_time, wb)
                 torch.save(self.network.to('cpu').state_dict(), path)  # 保存
+                self.network.to(dev)
 
         self.train_time += 1
         self.w_states[worker_id] = self.workers.reset(worker_id)
