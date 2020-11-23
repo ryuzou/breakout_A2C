@@ -12,18 +12,24 @@ class Network(torch.nn.Module):
         # define network
         self.alpha = alpha
         self.beta = beta
-        self.c1 = nn.Conv2d(step_repeat_times, 32, 3, stride=2, padding=1)
-        self.c2 = nn.Conv2d(32, 32, 3, stride=2, padding=1)
-        self.c3 = nn.Conv2d(32, 32, 3, stride=2, padding=1)
-        self.c4 = nn.Conv2d(32, 32, 3, stride=2, padding=1)
-        l5_out = 32*3*3
-        self.l5 = nn.Linear(32*3*3*4, l5_out)  # 大きさ分からん
+        self.c1 = nn.Conv2d(step_repeat_times, 32, 8, stride=4, padding=1)
+        self.c2 = nn.Conv2d(32, 64, 4, stride=2, padding=1)
+        self.c3 = nn.Conv2d(64, 64, 3, stride=1, padding=1)
+        # self.c4 = nn.Conv2d(32, 32, 3, stride=2, padding=1)
+        l5_out = 512
+        self.l5 = nn.Linear(6400, l5_out)  # 大きさ分からん
         self.critic = nn.Linear(l5_out, 1)
         self.actor = nn.Linear(l5_out, action_space)
 
         # init bias of network
-        self.critic.bias.data.fill_(0)
-        self.actor.bias.data.fill_(0)
+        nn.init.kaiming_normal_(self.c1.weight)
+        nn.init.kaiming_normal_(self.c2.weight)
+        nn.init.kaiming_normal_(self.c3.weight)
+#        nn.init.kaiming_normal_(self.c4.weight)
+        nn.init.kaiming_normal_(self.critic.weight)
+        nn.init.kaiming_normal_(self.actor.weight)
+        # self.critic.bias.data.fill_(0)
+        # self.actor.bias.data.fill_(0)
         self.train()
 
 
@@ -37,8 +43,8 @@ class Network(torch.nn.Module):
         # x = F.elu(self.c1(inputs))
         x = F.elu(self.c2(x))
         x = F.elu(self.c3(x))
-        x = F.elu(self.c4(x))  # [1, 32, 6, 6]
-        x = x.view(-1, 32 * 3 * 3 * 4)
+        # x = F.elu(self.c4(x))  # [1, 32, 6, 6]
+        x = x.view(1, -1)
         # print("x shape : {}".format(x.shape))
         x = F.elu(self.l5(x))
         # x = x.view(4 * 256)
@@ -55,6 +61,14 @@ class Network(torch.nn.Module):
         # print("act {}".format(act))
         return act.numpy().copy(), probs
 
+    def select_action2(self, state):
+        _, logits = self(state)
+        probs = F.softmax(logits, dim=0).to(dev)
+        c_rand = torch.distributions.categorical.Categorical(probs=probs.detach())  # detach はTensorから勾配を抜いた物
+        act = c_rand.sample().cpu()
+        # print("act {}".format(act))
+        return act.numpy().copy()
+
     def set_weight_on_network(self, g_net):  # 変数をセット(グローバルネットから取得した変数)
         for param, g_param in zip(self.parameters(), g_net.parameters()):
             if g_param.data is not None:
@@ -62,12 +76,11 @@ class Network(torch.nn.Module):
             param.data = g_param.data.clone()
 
     def calc_loss(self, states, acts, d_rews, probs):
-
-
         acts_one_hot = torch.from_numpy(np.identity(4)[acts]).to(dev)  # one_hot ベクトルに変換
         probs = torch.stack(probs, dim=0).to(dev)
         d_rews = torch.stack(d_rews, dim=0).view(-1).to(dev)
-        v_states = torch.stack([self(state)[0][0] for state in states], dim=0).view(-1).to(dev)
+        tmp = [self(state)[0][0] for state in states]
+        v_states = torch.stack(tmp, dim=0).view(-1).to(dev)
 
         # print("states size {}".format(v_states.shape))
         # # print("acts size {}".format(acts.shape))
@@ -88,6 +101,31 @@ class Network(torch.nn.Module):
         v_loss = (advantage **2).to(dev)
         a_loss = (log_pis * advantage).to(dev)
         # print("a_loss shape {}".format(a_loss.shape))
+        ans = 0.5*self.alpha*v_loss - a_loss - self.beta*entropy
+        ans = ans.to(dev)
+        ans = torch.sum(ans, dim=0).to(dev)
+
+        return ans
+
+    def calc_loss2(self, states, acts, d_rews):
+        acts_one_hot = torch.from_numpy(np.identity(4)[acts]).to(dev)  # one_hot ベクトルに変換
+        probs, crt = [], []
+        for state in states:
+            tmp = self(state)
+            prob = F.softmax(tmp[1], dim=0).to(dev)
+            probs.append(F.softmax(tmp[1], dim=0).to(dev)[0])
+            crt.append(tmp[0][0])
+
+        probs = torch.stack(probs, dim=0).to(dev)
+        d_rews = torch.stack(d_rews, dim=0).view(-1).to(dev)
+        v_states = torch.stack(crt, dim=0).view(-1).to(dev)
+
+        pis = torch.sum(acts_one_hot * probs, dim=1).to(dev)
+        log_pis = torch.log(pis).to(dev)  # log(pi(a_t|s_t)) (t=1,2,...)
+        entropy = -torch.dot(pis, log_pis).to(dev)
+        advantage = d_rews - v_states
+        v_loss = (advantage **2).to(dev)
+        a_loss = (log_pis * advantage).to(dev)
         ans = 0.5*self.alpha*v_loss - a_loss - self.beta*entropy
         ans = ans.to(dev)
         ans = torch.sum(ans, dim=0).to(dev)

@@ -19,7 +19,7 @@ class gym_env:
         self.env = gym.make("BreakoutDeterministic-v4")
         self.env.reset()
         if worker_id == 0:
-            self.env = wrappers.Monitor(self.env, "/home/emile/Videos/", video_callable=(lambda ep: ep % 50 == 0))
+            self.env = wrappers.Monitor(self.env, "/home/emile/Videos/", video_callable=(lambda ep: ep % 15 == 0))
         self.life = -1
         self.fire_action = 1
 
