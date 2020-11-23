@@ -238,7 +238,7 @@ class Agent:
         ac_rew, _ = self.network(last_state)
         ac_rew = ac_rew[0].detach()
         if flags[-1]:
-            ac_rew = torch.Tensor([0.0])
+            ac_rew = torch.Tensor([0.0]).to(dev)
         for rew, flag in zip(rews, flags):
             ac_rew = flag * gamma * ac_rew + rew
             d_rews.append(ac_rew)
@@ -369,15 +369,15 @@ class Agent:
             states, d_rews, acts = self.play_n_step3()
             # loss = self.network.calc_loss(states, acts, d_rews, probs)
             loss = self.network.calc_loss2(states, acts, d_rews)
-            dot = torchviz.make_dot(loss, params=dict(self.network.named_parameters()))
-            dot.format = 'png'
-            global TMP
-            if not TMP:
-                dot.render('/home/emile/Documents/Code/breakout_A2C/graph_image')
-                TMP = True
+            # dot = torchviz.make_dot(loss, params=dict(self.network.named_parameters()))
+            # dot.format = 'png'
+            # global TMP
+            # if not TMP:
+            #     dot.render('/home/emile/Documents/Code/breakout_A2C/graph_image')
+            #     TMP = True
             self.optimizer.zero_grad()
             loss.backward()
-
+            torch.nn.utils.clip_grad_norm_(self.network.parameters(), 0.5)
             self.optimizer.step()
 
 
