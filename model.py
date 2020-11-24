@@ -12,12 +12,12 @@ class Network(torch.nn.Module):
         # define network
         self.alpha = alpha
         self.beta = beta
-        self.c1 = nn.Conv2d(step_repeat_times, 32, 8, stride=4, padding=1)
-        self.c2 = nn.Conv2d(32, 64, 4, stride=2, padding=1)
-        self.c3 = nn.Conv2d(64, 64, 3, stride=1, padding=1)
+        self.c1 = nn.Conv2d(step_repeat_times, 32, 8, stride=4)
+        self.c2 = nn.Conv2d(32, 64, 4, stride=2)
+        self.c3 = nn.Conv2d(64, 64, 3, stride=1)
         # self.c4 = nn.Conv2d(32, 32, 3, stride=2, padding=1)
         l5_out = 512
-        self.l5 = nn.Linear(6400, l5_out)  # 大きさ分からん
+        self.l5 = nn.Linear(3136, l5_out)  # 大きさ分からん
         self.critic = nn.Linear(l5_out, 1)
         self.actor = nn.Linear(l5_out, action_space)
 
@@ -63,7 +63,7 @@ class Network(torch.nn.Module):
 
     def select_action2(self, state):
         _, logits = self(state)
-        probs = F.softmax(logits, dim=0).to(dev)
+        probs = F.softmax(logits, dim=1).to(dev)
         c_rand = torch.distributions.categorical.Categorical(probs=probs.detach())  # detach はTensorから勾配を抜いた物
         act = c_rand.sample().cpu()
         # print("act {}".format(act))
@@ -91,7 +91,6 @@ class Network(torch.nn.Module):
         pis = torch.sum(acts_one_hot * probs, dim=1).to(dev)
         # print("pis shape {}.".format(pis.shape))
         log_pis = torch.log(pis).to(dev)  # log(pi(a_t|s_t)) (t=1,2,...)
-
         entropy = -torch.dot(pis, log_pis).to(dev)
         # print("d_res shape {}".format(d_rews.shape))
         # print("v_state shape {}".format(v_states.shape))
@@ -108,12 +107,11 @@ class Network(torch.nn.Module):
         return ans
 
     def calc_loss2(self, states, acts, d_rews):
-        acts_one_hot = torch.from_numpy(np.identity(4)[acts]).to(dev)  # one_hot ベクトルに変換
+        acts_one_hot = torch.from_numpy(np.identity(4, dtype=np.float)[acts]).to(dev)  # one_hot ベクトルに変換
         probs, crt = [], []
         for state in states:
             tmp = self(state)
-            prob = F.softmax(tmp[1], dim=0).to(dev)
-            probs.append(F.softmax(tmp[1], dim=0).to(dev)[0])
+            probs.append(F.softmax(tmp[1], dim=1).to(dev)[0])
             crt.append(tmp[0][0])
 
         probs = torch.stack(probs, dim=0).to(dev)

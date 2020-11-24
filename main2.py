@@ -23,6 +23,7 @@ frame_siz = 4
 Worker_num = 16
 alpha = 0.5
 beta = 0.005 # 0.01
+# beta = 0.01
 gamma = 0.99
 pic_width = 84
 pic_height = 84
@@ -30,6 +31,7 @@ convert_shape = (-1, frame_siz, pic_width, pic_height)
 import_flag = False
 flag_google = False
 export_flag = False
+
 
 @dataclass
 class step_info:
@@ -117,6 +119,13 @@ class Workers:
         step = self.self_pips[worker_id].recv()
         return step
 
+    def step2(self, worker_id, action):
+        self.self_pips[worker_id].send(("step", action))
+        step = self.self_pips[worker_id].recv()
+        if (step.done or step.info):
+            step.reward = -1.0
+        return step
+
     def reset(self, worker_id):
         self.self_pips[worker_id].send(("reset", None))
         return self.self_pips[worker_id].recv()
@@ -182,7 +191,7 @@ class Agent:
     def __init__(self):
         self.network = Network(action_space=4, step_repeat_times=frame_siz, alpha=alpha, beta=beta)
         self.workers = Workers(num_workers=Worker_num)
-        self.optimizer = torch.optim.Adam(self.network.parameters(), lr=0.00005)
+        self.optimizer = torch.optim.Adam(self.network.parameters(), lr=1e-4)
         self.global_score = collections.deque(maxlen=50)
         self.w_states = [self.workers.get_state(i) for i in range(self.workers.num_workers)]  # states of each workers.
         self.w_stop = []  # if true then do not worker.step()
@@ -200,7 +209,6 @@ class Agent:
                 self.network.load_state_dict(torch.load(path, map_location=torch.device('cpu')))
             with open(data_path, 'rb') as wb:
                 self.train_time = pickle.load(wb)
-
 
     def calc_drew(self, rews, last_state):  # last_state は時系列的に最後のstate (n_states[-1]でok)
         d_rews = []
@@ -250,7 +258,7 @@ class Agent:
 
         for i, state in enumerate(now_states):  # 行動選択
             act = self.network.select_action2(state)
-            step = self.workers.step(i, act[0])
+            step = self.workers.step2(i, act[0])
             states.append(step.state)
             acts.append([step.action])
             rews.append([step.reward])
@@ -286,8 +294,9 @@ class Agent:
             for d_rew in d_rews_tmp:
                 d_rews_ans.append(d_rew)
 
-        states = self.reshaper_v(states).reshape((self.workers.num_workers * trajectory_size, 1, frame_siz, pic_width, pic_height))
-        return states, d_rews_ans, self.reshaper_h(acts).tolist()#, self.reshaper_h(probs).tolist()
+        states = self.reshaper_v(states).reshape(
+            (self.workers.num_workers * trajectory_size, 1, frame_siz, pic_width, pic_height))
+        return states, d_rews_ans, self.reshaper_h(acts).tolist()  # , self.reshaper_h(probs).tolist()
 
     def reshaper_h(self, tmps):
         ans = np.array([])
@@ -300,7 +309,6 @@ class Agent:
         for tmp in tmps:
             ans = np.vstack((ans, tmp)) if ans.size != 0 else np.array(tmp)
         return ans
-
 
     def play_n_step2(self):
         _states = [[] for _ in range(self.workers.num_workers)]
