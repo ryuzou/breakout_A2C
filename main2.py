@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import numpy as np
 import torch
-import torchviz
+# import torchviz
 from env import gym_env
 from model import Network
 import pickle
@@ -22,7 +22,7 @@ advantage_len = 5
 frame_siz = 4
 Worker_num = 16
 alpha = 0.5
-beta = 0.005 # 0.01
+beta = 0.005  # 0.01
 # beta = 0.01
 gamma = 0.99
 pic_width = 84
@@ -57,8 +57,8 @@ def worker_func(worker_id, pipe):
             n_state, rew, done, info = env.step(act)
             pict_queue.append(n_state)
             score += rew
-            if rew > 0.0:
-                rew /= trajectory_size  # new
+            # if rew > 0.0:
+            #     rew /= trajectory_size  # new
             n_state = np.stack(pict_queue, axis=0).reshape(convert_shape)
             ans = step_info(states, act, rew, n_state, done, info)
             states = n_state
@@ -204,7 +204,7 @@ class Agent:
                 path = 'model.pth'
                 data_path = 'data.bin'
             if torch.cuda.is_available():
-                self.network.load_state_dict(torch.load(path), map_location=torch.device('cuda:0'))
+                self.network.load_state_dict(torch.load(path, map_location=dev))
             else:
                 self.network.load_state_dict(torch.load(path, map_location=torch.device('cpu')))
             with open(data_path, 'rb') as wb:
@@ -235,8 +235,9 @@ class Agent:
                     data_path = 'data.bin'
                 with open(data_path, 'wb') as wb:
                     pickle.dump(self.train_time, wb)
-                torch.save(self.network.to('cpu').state_dict(), path)  # 保存
-                self.network.to(dev)
+                # torch.save(self.network.to('cpu').state_dict(), path)  # 保存
+                torch.save(self.network.state_dict(), path)  # 保存
+            # self.network.to(dev)
 
         self.train_time += 1
         self.w_states[worker_id] = self.workers.reset(worker_id)
@@ -376,6 +377,7 @@ class Agent:
             # states, d_rews, acts, probs = self.play_n_step()
             states, d_rews, acts = self.play_n_step3()
             # loss = self.network.calc_loss(states, acts, d_rews, probs)
+            # print("acts {}".format(acts))
             loss = self.network.calc_loss2(states, acts, d_rews)
             # dot = torchviz.make_dot(loss, params=dict(self.network.named_parameters()))
             # dot.format = 'png'
