@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 import numpy as np
 import torch
-import torchviz
-from env import gym_env
-from model import Network
+# import torchviz
+# from env import gym_env
+# from model import Network
 import pickle
 
 # from google.colab import drive  # インポート
@@ -29,8 +29,8 @@ pic_width = 84
 pic_height = 84
 convert_shape = (-1, frame_siz, pic_width, pic_height)
 import_flag = False
-flag_google = False
-export_flag = False
+flag_google = True
+export_flag = True
 
 
 @dataclass
@@ -246,12 +246,13 @@ class Agent:
         d_rews = []
         ac_rew, _ = self.network(last_state)
         # ac_rew = ac_rew[0].detach()
-        ac_rew = ac_rew[0].to(dev)
+        ac_rew = ac_rew[0]
         if flags[-1]:
             ac_rew = torch.Tensor([0.0]).to(dev)
         for rew, flag in zip(rews, flags):
-            ac_rew = flag * gamma * ac_rew + rew
+            ac_rew = gamma * ac_rew + rew
             d_rews.append(ac_rew)
+            ac_rew *= (not flag)
         d_rews.reverse()
         return d_rews
 
