@@ -22,15 +22,15 @@ advantage_len = 5
 frame_siz = 4
 Worker_num = 15
 alpha = 0.5
-beta = 0.005  # 0.01
-# beta = 0.01
+# beta = 0.005  # 0.01
+beta = 0.01
 gamma = 0.99
 pic_width = 84
 pic_height = 84
 convert_shape = (-1, frame_siz, pic_width, pic_height)
 import_flag = False
 flag_google = True
-export_flag = True
+export_flag = False
 
 
 @dataclass
@@ -247,8 +247,8 @@ class Agent:
     def calc_drew2(self, rews, last_state, flags):  # flag は done || info
         d_rews = []
         ac_rew, _ = self.network(last_state)
-        # ac_rew = ac_rew[0].detach()
-        ac_rew = ac_rew[0]
+        ac_rew = ac_rew[0].detach()
+        # ac_rew = ac_rew[0]
         if flags[-1]:
             ac_rew = torch.Tensor([0.0]).to(dev)
         for rew, flag in zip(reversed(rews), reversed(flags)):
