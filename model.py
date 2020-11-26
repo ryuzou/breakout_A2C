@@ -129,7 +129,7 @@ class Network(torch.nn.Module):
         log_pis = log_pis.gather(1, acts).squeeze().to(dev)
         entropy = -torch.dot(pis, log_pis).to(dev)
         advantage = d_rews - v_states
-        v_loss = (advantage **2).to(dev)
+        v_loss = (advantage ** 2).to(dev)
         a_loss = (log_pis * advantage).to(dev)
         ans = 0.5*self.alpha*v_loss - a_loss - self.beta*entropy
         ans = ans.to(dev)

@@ -5,6 +5,9 @@ import gym
 from gym import wrappers
 from PIL import Image
 
+# from google.colab import drive  # インポート
+# drive.mount('/content/gdrive')  # GoogleDriveのマウント
+
 pic_width = 84
 pic_height = 84
 
@@ -16,7 +19,7 @@ def change_pict(pict):
     frame = Image.fromarray(pict)
     frame = frame.convert("L")
     frame = frame.crop((0, 20, 160, 210))
-    frame = frame.resize((pic_width, pic_height))
+    frame = frame.resize((84, 84))
     frame = np.array(frame, dtype=np.float32)
     return frame
 
@@ -27,7 +30,10 @@ class gym_env:
         self.env.seed = worker_id
         self.env.reset()
         if worker_id == 0:
-            self.env = wrappers.Monitor(self.env, "/home/emile/Videos/", video_callable=(lambda ep: ep % 8 == 0))
+            self.env = wrappers.Monitor(self.env, "/home/emile/Videos/", video_callable=(lambda ep: ep % 15 == 0))
+        # if worker_id == 0:
+        #     path = F"/content/gdrive/My Drive/A2C/Videos/"  # 保存先pathの設定
+        #     self.env = wrappers.Monitor(self.env, path, video_callable=(lambda ep: ep % 8 == 0))
         self.life = -1
         self.fire_action = 1
 
