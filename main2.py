@@ -249,10 +249,9 @@ class Agent:
         ac_rew = ac_rew[0]
         if flags[-1]:
             ac_rew = torch.Tensor([0.0]).to(dev)
-        for rew, flag in zip(rews, flags):
-            ac_rew = gamma * ac_rew + rew
+        for rew, flag in zip(reversed(rews), reversed(flags)):
+            ac_rew = (not flag) * gamma * ac_rew + rew
             d_rews.append(ac_rew)
-            ac_rew *= (not flag)
         d_rews.reverse()
         return d_rews
 
