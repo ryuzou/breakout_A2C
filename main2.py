@@ -59,6 +59,8 @@ def worker_func(worker_id, pipe):
             score += rew
             # if rew > 0.0:
             #     rew /= trajectory_size  # new
+            if rew > 0.0:
+                rew = 1.0
             n_state = np.stack(pict_queue, axis=0).reshape(convert_shape)
             ans = step_info(states, act, rew, n_state, done, info)
             states = n_state
