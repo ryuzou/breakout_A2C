@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import numpy as np
 import torch
-# import torchviz
+import torchviz
 from env import gym_env
 from model import Network
 import pickle
@@ -20,7 +20,7 @@ act_repeat_time = 5
 trajectory_size = 5
 advantage_len = 5
 frame_siz = 4
-Worker_num = 16
+Worker_num = 15
 alpha = 0.5
 beta = 0.005  # 0.01
 # beta = 0.01
@@ -245,7 +245,8 @@ class Agent:
     def calc_drew2(self, rews, last_state, flags):  # flag は done || info
         d_rews = []
         ac_rew, _ = self.network(last_state)
-        ac_rew = ac_rew[0].detach()
+        # ac_rew = ac_rew[0].detach()
+        ac_rew = ac_rew[0].to(dev)
         if flags[-1]:
             ac_rew = torch.Tensor([0.0]).to(dev)
         for rew, flag in zip(rews, flags):

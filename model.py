@@ -25,15 +25,16 @@ class Network(torch.nn.Module):
         nn.init.kaiming_normal_(self.c1.weight)
         nn.init.kaiming_normal_(self.c2.weight)
         nn.init.kaiming_normal_(self.c3.weight)
-        #        nn.init.kaiming_normal_(self.c4.weight)
+#        nn.init.kaiming_normal_(self.c4.weight)
+        nn.init.kaiming_normal_(self.l5.weight)
         nn.init.kaiming_normal_(self.critic.weight)
         nn.init.kaiming_normal_(self.actor.weight)
         # self.critic.bias.data.fill_(0)
         # self.actor.bias.data.fill_(0)
         self.train()
 
-    def forward(self,
-                inputs):  # c1 -> elu -> c2 -> elu -> c3 -> elu -> c4 -> elu -> flatten -> l5 -> elu -> actor/critic
+
+    def forward(self, inputs):  # c1 -> elu -> c2 -> elu -> c3 -> elu -> c4 -> elu -> flatten -> l5 -> elu -> actor/critic
         inputs = torch.from_numpy(inputs).float().to(dev)
         inputs /= 255.0
         # print("inputs : {}".format(inputs.shape))
@@ -99,10 +100,10 @@ class Network(torch.nn.Module):
         advantage = d_rews - v_states
         # print("adv shape {}".format(advantage.shape))
         # print("log_pis {}".format(log_pis.shape))
-        v_loss = (advantage ** 2).to(dev)
+        v_loss = (advantage **2).to(dev)
         a_loss = (log_pis * advantage).to(dev)
         # print("a_loss shape {}".format(a_loss.shape))
-        ans = 0.5 * self.alpha * v_loss - a_loss - self.beta * entropy
+        ans = 0.5*self.alpha*v_loss - a_loss - self.beta*entropy
         ans = ans.to(dev)
         ans = torch.sum(ans, dim=0).to(dev)
 
@@ -114,7 +115,7 @@ class Network(torch.nn.Module):
         log_pis = []
         for state in states:
             tmp = self(state)
-            #  print("tmp {}".format(tmp))
+          #  print("tmp {}".format(tmp))
             probs.append(F.softmax(tmp[1], dim=1).to(dev)[0])
             log_pis.append(F.log_softmax(tmp[1], dim=1).to(dev)[0])
             crt.append(tmp[0][0])
@@ -123,15 +124,14 @@ class Network(torch.nn.Module):
         log_pis = torch.stack(log_pis, dim=0).to(dev)
         d_rews = torch.stack(d_rews, dim=0).view(-1).to(dev)
         v_states = torch.stack(crt, dim=0).view(-1).to(dev)
-
-        acts = torch.from_numpy(np.array(acts)).view(len(acts), 1)
-        pis = probs.gather(dim=1, index=acts).squeeze()
-        log_pis = log_pis.gather(1, acts).squeeze()
+        acts = torch.from_numpy(np.array(acts, dtype=np.int64)).view(len(acts), 1).to(dev)
+        pis = probs.gather(dim=1, index=acts).squeeze().to(dev)
+        log_pis = log_pis.gather(1, acts).squeeze().to(dev)
         entropy = -torch.dot(pis, log_pis).to(dev)
         advantage = d_rews - v_states
-        v_loss = (advantage ** 2).to(dev)
+        v_loss = (advantage **2).to(dev)
         a_loss = (log_pis * advantage).to(dev)
-        ans = 0.5 * self.alpha * v_loss - a_loss - self.beta * entropy
+        ans = 0.5*self.alpha*v_loss - a_loss - self.beta*entropy
         ans = ans.to(dev)
         ans = torch.sum(ans, dim=0).to(dev)
 
