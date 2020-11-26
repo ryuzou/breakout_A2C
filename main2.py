@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import numpy as np
 import torch
-# import torchviz
+import torchviz
 from env import gym_env
 from model import Network
 import pickle
@@ -382,12 +382,12 @@ class Agent:
             # loss = self.network.calc_loss(states, acts, d_rews, probs)
             # print("acts {}".format(acts))
             loss = self.network.calc_loss2(states, acts, d_rews)
-            # dot = torchviz.make_dot(loss, params=dict(self.network.named_parameters()))
-            # dot.format = 'png'
-            # global TMP
-            # if not TMP:
-            #     dot.render('/home/emile/Documents/Code/breakout_A2C/graph_image')
-            #     TMP = True
+            dot = torchviz.make_dot(loss, params=dict(self.network.named_parameters()))
+            dot.format = 'png'
+            global TMP
+            if not TMP:
+                dot.render('/home/emile/Documents/Code/breakout_A2C/graph_image')
+                TMP = True
             self.optimizer.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.network.parameters(), 0.5)
