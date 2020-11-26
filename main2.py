@@ -2,8 +2,8 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 # import torchviz
-# from env import gym_env
-# from model import Network
+from env import gym_env
+from model import Network
 import pickle
 
 # from google.colab import drive  # インポート
