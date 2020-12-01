@@ -15,9 +15,8 @@ class Network(torch.nn.Module):
         self.c1 = nn.Conv2d(step_repeat_times, 32, 8, stride=4)
         self.c2 = nn.Conv2d(32, 64, 4, stride=2)
         self.c3 = nn.Conv2d(64, 64, 3, stride=1)
-        # self.c4 = nn.Conv2d(32, 32, 3, stride=2, padding=1)
         l5_out = 512
-        self.l5 = nn.Linear(3136, l5_out)  # 大きさ分からん
+        self.l5 = nn.Linear(3136, l5_out)
         self.critic = nn.Linear(l5_out, 1)
         self.actor = nn.Linear(l5_out, action_space)
 
@@ -25,33 +24,20 @@ class Network(torch.nn.Module):
         nn.init.kaiming_normal_(self.c1.weight)
         nn.init.kaiming_normal_(self.c2.weight)
         nn.init.kaiming_normal_(self.c3.weight)
-#        nn.init.kaiming_normal_(self.c4.weight)
         nn.init.kaiming_normal_(self.l5.weight)
         nn.init.kaiming_normal_(self.critic.weight)
         nn.init.kaiming_normal_(self.actor.weight)
-        # self.critic.bias.data.fill_(0)
-        # self.actor.bias.data.fill_(0)
         self.train()
 
-
-    def forward(self, inputs):  # c1 -> elu -> c2 -> elu -> c3 -> elu -> c4 -> elu -> flatten -> l5 -> elu -> actor/critic
+    def forward(self, inputs):  # c1 -> relu -> c2 -> relu -> c3 -> relu -> l5 -> relu -> actor/critic
         inputs = torch.from_numpy(inputs).float().to(dev)
         inputs /= 255.0
-        # print("inputs : {}".format(inputs.shape))
-        x = self.c1(inputs)
-        # print("x shape : {}".format(x.shape))
-        x = F.relu(x)
-        # x = F.elu(self.c1(inputs))
+        x = F.relu(self.c1(inputs))
         x = F.relu(self.c2(x))
         x = F.relu(self.c3(x))
-        # x = F.elu(self.c4(x))  # [1, 32, 6, 6]
         x = x.view(1, -1)
-        # print("x shape : {}".format(x.shape))
         x = F.relu(self.l5(x))
-        # x = x.view(4 * 256)
         ans = self.critic(x), self.actor(x)
-        # print("net critic shape : {}".format(self.critic(x).shape))
-        # print("net actor shape : {}".format(self.actor(x).shape))
         return ans
 
     def select_action(self, state):
@@ -65,11 +51,7 @@ class Network(torch.nn.Module):
     def select_action2(self, state):
         _, logits = self(state)
         probs = F.softmax(logits, dim=1).to(dev)
-        # print("probs s_action2 {}".format(probs))
-        # c_rand = torch.distributions.categorical.Categorical(probs=probs.detach())  # detach はTensorから勾配を抜いた物
         act = probs.multinomial(num_samples=1).cpu()[0]
-        # act = c_rand.sample().cpu()  # ここはcpuでないとcopyできない
-        # print("act {}".format(act))
         return act.numpy().copy()
 
     def set_weight_on_network(self, g_net):  # 変数をセット(グローバルネットから取得した変数)
@@ -100,26 +82,24 @@ class Network(torch.nn.Module):
         advantage = d_rews - v_states
         # print("adv shape {}".format(advantage.shape))
         # print("log_pis {}".format(log_pis.shape))
-        v_loss = (advantage **2).to(dev)
+        v_loss = (advantage ** 2).to(dev)
         a_loss = (log_pis * advantage).to(dev)
         # print("a_loss shape {}".format(a_loss.shape))
-        ans = 0.5*self.alpha*v_loss - a_loss - self.beta*entropy
+        ans = 0.5 * self.alpha * v_loss - a_loss - self.beta * entropy
         ans = ans.to(dev)
         ans = torch.sum(ans, dim=0).to(dev)
 
         return ans
 
     def calc_loss2(self, states, acts, d_rews):
-        acts_one_hot = torch.from_numpy(np.identity(4, dtype=np.float)[acts]).to(dev)  # one_hot ベクトルに変換
         probs, crt = [], []
         log_pis = []
         for state in states:
             tmp = self(state)
-          #  print("tmp {}".format(tmp))
             probs.append(F.softmax(tmp[1], dim=1).to(dev)[0])
             log_pis.append(F.log_softmax(tmp[1], dim=1).to(dev)[0])
             crt.append(tmp[0][0])
-        # print("acts oh {}".format(acts_one_hot))
+
         probs = torch.stack(probs, dim=0).to(dev)
         log_pis = torch.stack(log_pis, dim=0).to(dev)
         d_rews = torch.stack(d_rews, dim=0).view(-1).to(dev)
@@ -131,8 +111,6 @@ class Network(torch.nn.Module):
         advantage = d_rews - v_states
         v_loss = (advantage ** 2).to(dev)
         a_loss = (log_pis * (advantage.detach())).to(dev)
-        ans = 0.5*self.alpha*v_loss - a_loss - self.beta*entropy
-        ans = ans.to(dev)
+        ans = (0.5 * self.alpha * v_loss - a_loss - self.beta * entropy).to(dev)
         ans = torch.sum(ans, dim=0).to(dev)
-
         return ans

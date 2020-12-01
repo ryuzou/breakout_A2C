@@ -1,21 +1,13 @@
 import numpy as np
-from skimage.color import rgb2gray
-from skimage.transform import resize
 import gym
 from gym import wrappers
 from PIL import Image
-
-# from google.colab import drive  # インポート
-# drive.mount('/content/gdrive')  # GoogleDriveのマウント
 
 pic_width = 84
 pic_height = 84
 
 
 def change_pict(pict):
-    # pict = pict[49:193, 8:152]  # new
-    # ans = resize(rgb2gray(pict), (pic_width, pic_height))
-    # return np.array(ans)
     frame = Image.fromarray(pict)
     frame = frame.convert("L")
     frame = frame.crop((0, 20, 160, 210))
@@ -29,11 +21,8 @@ class gym_env:
         self.env = gym.make("BreakoutDeterministic-v4")
         self.env.seed = worker_id
         self.env.reset()
-        if worker_id == 0:
-            self.env = wrappers.Monitor(self.env, "/home/emile/Videos/", video_callable=(lambda ep: ep % 15 == 0))
         # if worker_id == 0:
-        #     path = F"/content/gdrive/My Drive/A2C/Videos/"  # 保存先pathの設定
-        #     self.env = wrappers.Monitor(self.env, path, video_callable=(lambda ep: ep % 8 == 0))
+        #     self.env = wrappers.Monitor(self.env, "/home/emile/Videos/", video_callable=(lambda ep: ep % 15 == 0))
         self.life = -1
         self.fire_action = 1
 
